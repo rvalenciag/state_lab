@@ -17,7 +17,7 @@ export function TechnologySelector({ activeTechnology, onSelect }) {
                     compras.
                 </p>
             </div>
-            <div className="segmented" role="tablist" aria-label="Tecnología de gestión de estado">
+            <div className="segmented" role="group" aria-label="Tecnología de gestión de estado">
                 {technologies.map((technology) => {
                     const isActive = technology.id === activeTechnology
 
@@ -26,8 +26,7 @@ export function TechnologySelector({ activeTechnology, onSelect }) {
                             key={technology.id}
                             className={`segmented-btn ${isActive ? 'is-active' : ''}`}
                             type="button"
-                            role="tab"
-                            aria-selected={isActive}
+                            aria-pressed={isActive}
                             onClick={() => onSelect(technology.id)}
                         >
                             {technology.name}

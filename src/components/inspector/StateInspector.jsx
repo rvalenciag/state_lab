@@ -1,5 +1,5 @@
 import { Clipboard, Copy, ShoppingCart } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { productsById } from '../../data/products'
 import { getTotal, getUnits } from '../../domain/cartSelectors'
 
@@ -223,15 +223,34 @@ function ClearChangeDetails({ event }) {
 }
 
 function JsonViewer({ items, event, latestEventId }) {
-    const [copied, setCopied] = useState(false)
+    const [copyStatus, setCopyStatus] = useState('idle')
+    const resetCopyStatusTimer = useRef()
     const isHistorical = event && event.id !== latestEventId
     const data = event ? event.after : items
     const text = JSON.stringify({ items: data }, null, 2)
 
+    useEffect(() => {
+        return () => window.clearTimeout(resetCopyStatusTimer.current)
+    }, [])
+
+    function showCopyStatus(status) {
+        window.clearTimeout(resetCopyStatusTimer.current)
+        setCopyStatus(status)
+        resetCopyStatusTimer.current = window.setTimeout(() => setCopyStatus('idle'), 1800)
+    }
+
     async function copyJson() {
-        await navigator.clipboard?.writeText(text)
-        setCopied(true)
-        window.setTimeout(() => setCopied(false), 1400)
+        if (!navigator.clipboard?.writeText) {
+            showCopyStatus('error')
+            return
+        }
+
+        try {
+            await navigator.clipboard.writeText(text)
+            showCopyStatus('copied')
+        } catch {
+            showCopyStatus('error')
+        }
     }
 
     return (
@@ -241,8 +260,14 @@ function JsonViewer({ items, event, latestEventId }) {
                     {isHistorical ? 'Captura histórica · estado posterior' : 'Estado actual'}
                 </span>
                 <button className="btn btn-secondary btn-copy" type="button" onClick={copyJson}>
-                    {copied ? <Clipboard /> : <Copy />}
-                    <span>{copied ? 'Copiado' : 'Copiar'}</span>
+                    {copyStatus === 'copied' ? <Clipboard /> : <Copy />}
+                    <span>
+                        {copyStatus === 'copied'
+                            ? 'Copiado'
+                            : copyStatus === 'error'
+                              ? 'No se pudo copiar'
+                              : 'Copiar'}
+                    </span>
                 </button>
             </div>
             <pre className="code-block">
@@ -287,8 +312,19 @@ function UpdateFlow({ technology }) {
 
 export function StateInspector({ technology, technologyName, items, history }) {
     const [view, setView] = useState('changes')
-    const [selectedId, setSelectedId] = useState(null)
+    const [manualSelection, setManualSelection] = useState(null)
+    const latestEvent = history[0] ?? null
+    const latestEventId = latestEvent?.id ?? null
+    const selectedId =
+        manualSelection?.latestEventId === latestEventId ? manualSelection.eventId : latestEventId
     const selectedEvent = history.find((event) => event.id === selectedId) ?? history[0] ?? null
+
+    function selectHistoricalEvent(eventId) {
+        setManualSelection({
+            eventId,
+            latestEventId,
+        })
+    }
 
     return (
         <section className="section card inspector" aria-labelledby="inspector-title">
@@ -319,7 +355,7 @@ export function StateInspector({ technology, technologyName, items, history }) {
                     <OperationHistory
                         history={history}
                         selectedId={selectedEvent?.id}
-                        onSelect={setSelectedId}
+                        onSelect={selectHistoricalEvent}
                     />
                 </div>
                 <div className="panel change">
@@ -330,10 +366,11 @@ export function StateInspector({ technology, technologyName, items, history }) {
                                 Detalle de cómo se modificó el estado después de una operación.
                             </p>
                         </div>
-                        <div className="toggle" role="tablist" aria-label="Vista del cambio">
+                        <div className="toggle" role="group" aria-label="Vista del cambio">
                             <button
                                 className={`toggle-btn ${view === 'changes' ? 'is-active' : ''}`}
                                 type="button"
+                                aria-pressed={view === 'changes'}
                                 onClick={() => setView('changes')}
                             >
                                 Cambios
@@ -341,6 +378,7 @@ export function StateInspector({ technology, technologyName, items, history }) {
                             <button
                                 className={`toggle-btn ${view === 'json' ? 'is-active' : ''}`}
                                 type="button"
+                                aria-pressed={view === 'json'}
                                 onClick={() => setView('json')}
                             >
                                 Estado (JSON)
@@ -354,7 +392,7 @@ export function StateInspector({ technology, technologyName, items, history }) {
                             <JsonViewer
                                 items={items}
                                 event={selectedEvent}
-                                latestEventId={history[0]?.id}
+                                latestEventId={latestEventId}
                             />
                         )}
                     </div>

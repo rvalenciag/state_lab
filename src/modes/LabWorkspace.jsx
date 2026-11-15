@@ -36,7 +36,6 @@ export function LabWorkspace({ technology, technologyName, cart }) {
                 />
             </section>
             <StateInspector
-                key={`${technology}-${cart.history[0]?.id ?? 'empty'}`}
                 technology={technology}
                 technologyName={technologyName}
                 items={cart.items}
